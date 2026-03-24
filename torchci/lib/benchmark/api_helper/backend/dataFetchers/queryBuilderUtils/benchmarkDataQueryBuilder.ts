@@ -77,6 +77,8 @@ export class BenchmarkDataQuery extends ExecutableQueryBase {
     excludedMetrics: [],
     models: [],
     workflows: [],
+    device: "",
+    arch: "",
   };
 
   // must included in all select statement
@@ -86,7 +88,7 @@ export class BenchmarkDataQuery extends ExecutableQueryBase {
     this._required_metadata_info_statements = new Map([
       [
         "timestamp",
-        "formatDateTime(fromUnixTimestamp(timestamp), '%Y-%m-%dT%H:%i:%sZ')",
+        "formatDateTime(fromUnixTimestamp(intDiv(timestamp, 1000)), '%Y-%m-%dT%H:%i:%sZ')",
       ],
     ]);
 
@@ -102,50 +104,50 @@ export class BenchmarkDataQuery extends ExecutableQueryBase {
         where_exists: true,
         // default select statement for customized query
         select: [
-          ["floor(arrayAvg(o.metric.'benchmark_values'), 2)", "value"],
+          ["if(notEmpty(o.extra['mean_ttft_ms']), toFloat64OrZero(o.extra['mean_ttft_ms']), if(notEmpty(o.extra['throughput_req_s']), toFloat64OrZero(o.extra['throughput_req_s']), if(notEmpty(o.extra['mean_latency_ms']), toFloat64OrZero(o.extra['mean_latency_ms']), if(notEmpty(o.extra['throughput_tok_s']), toFloat64OrZero(o.extra['throughput_tok_s']), if(notEmpty(o.extra['value']), toFloat64OrZero(o.extra['value']), 0)))))", "value"],
           ["map()", this._EXTRA_KEY_FIELD_NAME],
           metadata_info_select,
         ],
         prewhere: [
-          "o.timestamp >= toUnixTimestamp({startTime: DateTime64(3) })",
-          "o.timestamp < toUnixTimestamp({stopTime: DateTime64(3) })",
+          "o.timestamp >= toUnixTimestamp(parseDateTime64BestEffort({startTime: String}, 3)) * 1000",
+          "o.timestamp < toUnixTimestamp(parseDateTime64BestEffort({stopTime: String}, 3)) * 1000",
         ],
       },
       `
       SELECT
         replaceOne(o.head_branch, 'refs/heads/', '') AS branch,
         o.workflow_id AS workflow_id,
-        o.job_id AS job_id,
+        '' AS job_id,
         o.repo AS repo,
         o.head_sha AS commit,
-        o.model.'name' AS model,
-        o.model.'backend' AS backend,
-        o.model.'origins' AS origins,
-        o.metric.'name' AS metric,
-        floor(toFloat64(o.metric.'target_value'), 2) AS target,
-        o.benchmark.'mode' AS mode,
-        o.benchmark.'dtype' AS dtype,
+        tupleElement(o.model, 'name') AS model,
+        '' AS backend,
+        '' AS origins,
+        tupleElement(o.metric, 'name') AS metric,
+        0 AS target,
+        '' AS mode,
+        '' AS dtype,
         if(
-          empty(tupleElement(runners[1], 'name')),
+          empty(tupleElement(runners, 'name')),
           if(
               empty(tupleElement(benchmark, 'extra_info')['device']),
               'cpu',
               tupleElement(benchmark, 'extra_info')['device']
             ),
-            tupleElement(runners[1], 'name')
+            tupleElement(runners, 'name')
         ) AS device,
        if(
-        empty(tupleElement(runners[1], 'type')),
+        empty(tupleElement(runners, 'name')),
           if(
             empty(tupleElement(benchmark, 'extra_info')['arch']),
-            tupleElement(runners[1], 'cpu_info'),
+            'unknown',
             tupleElement(benchmark, 'extra_info')['arch']
           ),
-          tupleElement(runners[1], 'type')
+          tupleElement(benchmark, 'extra_info')['arch']
         ) AS arch,
         DATE_TRUNC(
             {granularity: String },
-            fromUnixTimestamp(o.timestamp)
+            fromUnixTimestamp(intDiv(o.timestamp, 1000))
         ) AS granularity_bucket
         {{SELECT}}
         FROM {{TABLE}}
@@ -157,30 +159,27 @@ export class BenchmarkDataQuery extends ExecutableQueryBase {
             OR empty({workflows: Array(Int64) })
         )
         AND (
-            o.benchmark.'name' in {benchmarkNames: Array(String) }
+            tupleElement(o.benchmark, 'name') in {benchmarkNames: Array(String) }
             OR empty({benchmarkNames: Array(String) })
         )
         AND (
-            has({models: Array(String) }, o.model.'name')
+            has({models: Array(String) }, tupleElement(o.model, 'name'))
             OR empty({models: Array(String) })
         )
         AND (
-            has({backends: Array(String) }, o.model.'backend')
-            OR empty({backends: Array(String) })
+            empty({backends: Array(String) })
         )
         AND (
-            has({modes: Array(String) }, o.benchmark.'mode')
-            OR empty({modes: Array(String) })
+            empty({modes: Array(String) })
         )
         AND (
-            has({dtypes: Array(String) }, o.benchmark.'dtype')
-            OR empty({dtypes: Array(String) })
+            empty({dtypes: Array(String) })
         )
         AND (
-            NOT has({excludedMetrics: Array(String) }, o.metric.'name')
+            NOT has({excludedMetrics: Array(String) }, tupleElement(o.metric, 'name'))
             OR empty({excludedMetrics: Array(String) })
         )
-        AND notEmpty(o.metric.'name')
+        AND notEmpty(tupleElement(o.metric, 'name'))
         {{WHERE}}
     `
     );
@@ -445,11 +444,7 @@ export class PytorchOperatorMicroBenchmarkDataFetcher
       new Map([
         [
           "operator_name",
-          `IF(
-            tupleElement(o.benchmark, 'extra_info')['operator_name'] = '',
-            arrayElement(splitByChar('_', tupleElement(o.model, 'name')), 1),
-            tupleElement(o.benchmark, 'extra_info')['operator_name']
-          )`,
+          `''`,
         ],
         [
           "use_compile",
@@ -506,14 +501,14 @@ export class PytorchHelionDataFetcher
     super();
     this._data_query = new BenchmarkDataQuery();
     this._data_query.replaceValueSelectStatement(
-      "floor(exp(arrayAvg(arrayMap(x -> log(x), o.metric.'benchmark_values'))), 2)"
+      "0"
     );
     this._data_query.addSelectStatement(
-      "floor(arrayAvg(o.metric.'benchmark_values'), 2)",
+      "0",
       "avg_value"
     );
     this._data_query.addSelectStatement(
-      "tupleElement(o.metric, 'benchmark_values')",
+      "[]",
       "raw_value_list"
     );
   }
@@ -647,83 +642,41 @@ export class VllmBenchmarkDataFetcher
   constructor() {
     super();
     this._data_query = new BenchmarkDataQuery();
-    // add extra info to the query
+    // add extra info to the query - keep it minimal to avoid schema mismatches
     this._data_query.addExtraInfos(
       new Map([
-        [
-          "model_category",
-          `IF(
-              tupleElement(o.benchmark, 'extra_info')['model_category'] = '',
-              arrayElement(splitByChar('/', tupleElement(o.model, 'name')), 1),
-              tupleElement(o.benchmark, 'extra_info')['model_category']
-            )`,
-        ],
+        ["model_category", `''`],
         [
           "use_compile",
-          `IF(
-                tupleElement(o.benchmark, 'extra_info')['compile'] = '',
-                'true',
-                tupleElement(o.benchmark, 'extra_info')['compile']
-                )`,
+          `tupleElement(o.benchmark, 'extra_info')['use_compile']`,
         ],
         [
           "request_rate",
-          `JSONExtractString(
-              tupleElement(o.benchmark, 'extra_info')['args'],
-              'request_rate'
-          )
-          `,
+          `tupleElement(o.benchmark, 'extra_info')['request_rate']`,
         ],
         [
           "tensor_parallel_size",
-          `JSONExtractString(
-                tupleElement(o.benchmark, 'extra_info')['args'],
-                'tensor_parallel_size'
-            )`,
+          `tupleElement(o.benchmark, 'extra_info')['tensor_parallel_size']`,
         ],
-        [
-          "random_input_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'random_input_len'
-            )`,
-        ],
-        [
-          "random_output_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'random_output_len'
-            )`,
-        ],
+        ["random_input_len", `''`],
+        ["random_output_len", `''`],
         [
           "input_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'input_len'
-            )`,
+          `tupleElement(o.benchmark, 'extra_info')['input_len']`,
         ],
         [
           "output_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'output_len'
-            )`,
+          `tupleElement(o.benchmark, 'extra_info')['output_len']`,
+        ],
+        [
+          "hardware_type",
+          `tupleElement(o.benchmark, 'extra_info')['hardware_type']`,
         ],
       ])
     );
-
+    // Only show compiled (non-eager) results, matching PyTorch HUD behavior
     this._data_query.addInnerWhereStatements([
-      `(
-          {modelCategory:String} = ''
-          OR startsWith(tupleElement(o.model, 'name'), {modelCategory:String})
-      )
-    `,
-      `(
-          {useCompile:String} = ''
-          OR tupleElement(o.benchmark, 'extra_info')['use_compile'] = ''
-          OR tupleElement(o.benchmark, 'extra_info')['use_compile'] = {useCompile:String}
-      )
-    `,
+      `tupleElement(o.benchmark, 'extra_info')['use_compile'] = 'true'`,
     ]);
   }
   applyFormat(
@@ -732,9 +685,7 @@ export class VllmBenchmarkDataFetcher
     includesAllExtraKey: boolean = true,
     _groupByFields?: string[]
   ) {
-    // nput and output length is the number of token feed into vLLM and the max output it returns.
-    //  random_input_len is the name of the the parameter on vLLM bench,
-    // for other type of benchmark, it could be called input_len
+    // Normalize input_len/output_len (same logic as VllmXPytorchBenchmarkDataFetcher)
     data.forEach((d) => {
       if (d.extra_key) {
         const dk = d.extra_key;
@@ -751,19 +702,11 @@ export class VllmBenchmarkDataFetcher
   }
 
   toQueryParams(inputs: any, id?: string): Record<string, any> {
-    const excludedMetrics = [
-      "mean_itl_ms",
-      "mean_tpot_ms",
-      "mean_ttft_ms",
-      "std_itl_ms",
-      "std_tpot_ms",
-      "std_ttft_ms",
-    ];
     const params = {
       ...inputs,
       modelCategory: inputs.modelCategory ?? "",
       useCompile: inputs.useCompile ?? "true",
-      excludedMetrics: excludedMetrics,
+      excludedMetrics: [],
     };
 
     return this._data_query.toQueryParams(params, id);

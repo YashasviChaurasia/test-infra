@@ -116,7 +116,7 @@ export const BENCHMARK_ID_MAPPING: Record<string, BenchmarkIdMappingItem> = {
   [VLLM_BENCHMARK_ID]: {
     id: VLLM_BENCHMARK_ID,
     repoName: "vllm-project/vllm",
-    benchmarkName: "vLLM benchmark",
+    benchmarkName: "vllm_benchmark",
   },
   [PYTORCH_GPTFAST_BENCHMARK_ID]: {
     id: PYTORCH_GPTFAST_BENCHMARK_ID,

@@ -24,11 +24,7 @@ export class VllmXPytorchBenchmarkDataFetcher
       new Map([
         [
           "model_category",
-          `IF(
-              tupleElement(o.benchmark, 'extra_info')['model_category'] = '',
-              arrayElement(splitByChar('/', tupleElement(o.model, 'name')), 1),
-              tupleElement(o.benchmark, 'extra_info')['model_category']
-            )`,
+          `''`,
         ],
         [
           "use_compile",
@@ -40,46 +36,27 @@ export class VllmXPytorchBenchmarkDataFetcher
         ],
         [
           "request_rate",
-          `JSONExtractString(
-              tupleElement(o.benchmark, 'extra_info')['args'],
-              'request_rate'
-          )
-          `,
+          `''`,
         ],
         [
           "tensor_parallel_size",
-          `JSONExtractString(
-                tupleElement(o.benchmark, 'extra_info')['args'],
-                'tensor_parallel_size'
-            )`,
+          `''`,
         ],
         [
           "random_input_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'random_input_len'
-            )`,
+          `''`,
         ],
         [
           "random_output_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'random_output_len'
-            )`,
+          `''`,
         ],
         [
           "input_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'input_len'
-            )`,
+          `''`,
         ],
         [
           "output_len",
-          `JSONExtractString(
-              tupleElement(benchmark, 'extra_info')['args'],
-              'output_len'
-            )`,
+          `''`,
         ],
       ])
     );

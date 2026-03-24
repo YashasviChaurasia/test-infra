@@ -13,8 +13,8 @@ export class BenchmarkListCommitQueryBuilder
     dtypes: [],
     modes: [],
     backends: [],
-    startTime: "",
-    stopTime: "",
+    startTime: "1970-01-01T00:00:00",
+    stopTime: "2099-12-31T23:59:59",
   };
   constructor() {
     super();
@@ -24,8 +24,8 @@ export class BenchmarkListCommitQueryBuilder
         select_exists: true,
         where_exists: true,
         prewhere: [
-          "timestamp >= toUnixTimestamp({startTime: DateTime64(3)})",
-          "timestamp < toUnixTimestamp({stopTime: DateTime64(3)})",
+          "timestamp >= toUnixTimestamp(parseDateTime64BestEffort({startTime: String}, 3)) * 1000",
+          "timestamp < toUnixTimestamp(parseDateTime64BestEffort({stopTime: String}, 3)) * 1000",
         ],
       },
       `
@@ -33,7 +33,7 @@ export class BenchmarkListCommitQueryBuilder
     replaceAll(head_branch, 'refs/heads/', '') AS branch,
     head_sha AS commit,
     workflow_id,
-    toStartOfHour(min(fromUnixTimestamp(timestamp))) AS date
+    toStartOfHour(min(fromUnixTimestamp(intDiv(timestamp, 1000)))) AS date
   {{SELECT}}
   FROM {{TABLE}}
   {{PREWHERE}}

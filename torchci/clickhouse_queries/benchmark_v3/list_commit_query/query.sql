@@ -2,11 +2,11 @@ SELECT
     replaceAll(head_branch, 'refs/heads/', '') AS branch,
     head_sha AS commit,
     workflow_id,
-    toStartOfHour(min(fromUnixTimestamp(timestamp))) AS date
+    toStartOfHour(min(fromUnixTimestamp(intDiv(timestamp, 1000)))) AS date
 FROM benchmark.oss_ci_benchmark_metadata
 PREWHERE
-    timestamp >= toUnixTimestamp({startTime: DateTime64(3)})
-    AND timestamp < toUnixTimestamp({stopTime:  DateTime64(3)})
+    timestamp >= toUnixTimestamp(parseDateTime64BestEffort({startTime: String}, 3)) * 1000
+    AND timestamp < toUnixTimestamp(parseDateTime64BestEffort({stopTime: String}, 3)) * 1000
 WHERE
     repo = {repo: String}
     AND (

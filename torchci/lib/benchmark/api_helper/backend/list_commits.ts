@@ -10,6 +10,7 @@ export async function listBenchmarkCommitsFromDb(
   queryParams: any,
   responseFormats: []
 ) {
+  console.log("[listBenchmarkCommitsFromDb] id:", id, "queryParams:", queryParams);
   const db = await getBenmarkCommits(id, queryParams);
   if (!db) {
     console.error("No data found for", id);

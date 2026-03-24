@@ -94,9 +94,9 @@ export const PytorchXVllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
       ...DEFAULT_DASHBOARD_BENCHMARK_INITIAL,
       benchmarkId: PYTORCH_X_VLLM_BENCHMARK_ID,
       filters: {
-        device: "cuda",
+        device: "NVIDIA_B200",
         arch: "NVIDIA B200",
-        deviceName: "cuda||NVIDIA H100 80GB HBM3",
+        deviceName: "NVIDIA_B200||NVIDIA B200",
       },
     },
     required_filter_fields: [],

@@ -37,8 +37,8 @@ export class BenchmarkMetadataQuery
         "arch",
       ],
       prewhere: [
-        "timestamp >= toUnixTimestamp({startTime: DateTime64(3)})",
-        "timestamp < toUnixTimestamp({stopTime: DateTime64(3)})",
+        "timestamp >= toUnixTimestamp({startTime: DateTime64(3)}) * 1000",
+        "timestamp < toUnixTimestamp({stopTime: DateTime64(3)}) * 1000",
       ],
       where: [
         "repo = {repo: String}",
@@ -293,15 +293,28 @@ export class VllmBenchmarkMetadataFetcher
   postProcess(data: any[]) {
     let li = getDefaultBenchmarkMetadataGroup(data);
 
-    // Remove the default "all" option for device
+    // Remove Backend, Mode, and DType filters for vLLM dashboard
+    li = li.filter(
+      (item) =>
+        item.type !== BenchmarkMetadataType.BackendName &&
+        item.type !== BenchmarkMetadataType.ModeName &&
+        item.type !== BenchmarkMetadataType.DtypeName
+    );
+
+    // Remove the default "all" option for device and set NVIDIA_B200 as default
     const deviceItem = li.find(
       (item) => item.type === BenchmarkMetadataType.DeviceName
     );
     if (deviceItem && deviceItem.options.length > 0) {
       // Remove the first option (default option with empty value)
       deviceItem.options = deviceItem.options.filter((opt) => opt.value !== "");
-      // Set initial value to first available option if exists
-      if (deviceItem.options.length > 0) {
+      // Set initial value to NVIDIA_B200 if it exists, otherwise first available option
+      const nvidiaB200 = deviceItem.options.find(
+        (opt) => opt.value.startsWith("NVIDIA_B200")
+      );
+      if (nvidiaB200) {
+        deviceItem.initialValue = nvidiaB200.value;
+      } else if (deviceItem.options.length > 0) {
         deviceItem.initialValue = deviceItem.options[0].value;
       }
     }

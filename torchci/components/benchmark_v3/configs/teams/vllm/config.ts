@@ -20,17 +20,19 @@ const TIME_METRIC_POLICY: BenchmarkComparisonPolicyConfig = {
 
 const COMPARISON_POLICY_BOOK = {
   latency: TIME_METRIC_POLICY,
-  median_itl_ms: TIME_METRIC_POLICY,
-  median_tpot_ms: TIME_METRIC_POLICY,
+  median_latency_ms: TIME_METRIC_POLICY,
   median_ttft_ms: TIME_METRIC_POLICY,
-  p99_itl_ms: TIME_METRIC_POLICY,
-  p99_tpot_ms: TIME_METRIC_POLICY,
+  median_tpot_ms: TIME_METRIC_POLICY,
+  median_itl_ms: TIME_METRIC_POLICY,
   p99_ttft_ms: TIME_METRIC_POLICY,
+  p99_tpot_ms: TIME_METRIC_POLICY,
+  p99_itl_ms: TIME_METRIC_POLICY,
+  requests_per_second: TIME_METRIC_POLICY,
 };
 
-const COMPARISON_TABLE_METADATA_COLUMNS = [
+const METADATA_COLUMNS = [
   {
-    field: "device",
+    field: "extra_key.hardware_type",
     displayName: "Hardware type",
   },
   {
@@ -68,8 +70,8 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
     initial: {
       ...DEFAULT_DASHBOARD_BENCHMARK_INITIAL,
       benchmarkId: VLLM_BENCHMARK_ID,
-      lbranch: "main(main)",
-      rbranch: "main(main)",
+      lbranch: "main",
+      rbranch: "main",
       filters: {
         device: "cuda",
         arch: "NVIDIA B200",
@@ -89,16 +91,13 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
           deviceName: {
             disableOptions: [""],
           },
-          mode: {
-            disableOptions: [""],
-          },
         },
         renders: [
           {
             type: "AutoBenchmarkMarkDownContent",
             config: {
               content:
-                "The data is generaterd based on pinned pytorch with latest vllm, powered by pytorch-integration-testing [workflow](https://github.com/pytorch/pytorch-integration-testing/actions/workflows/vllm-benchmark.yml)",
+                "vLLM V1 Benchmark Dashboard - Compare performance metrics across commits",
             },
           },
           {
@@ -131,12 +130,9 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
                 fields: ["model"],
                 displayName: "Model",
               },
-              extraMetadata: COMPARISON_TABLE_METADATA_COLUMNS,
+              extraMetadata: METADATA_COLUMNS,
               renderOptions: {
                 missingText: "",
-                flex: {
-                  primary: 2,
-                },
               },
             },
           },
@@ -146,7 +142,7 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
             config: {
               extraMetadata: [
                 BRANCH_METADATA_COLUMN,
-                ...COMPARISON_TABLE_METADATA_COLUMNS,
+                ...METADATA_COLUMNS,
               ],
             },
           },
@@ -158,7 +154,7 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
         type: "AutoBenchmarkMarkDownContent",
         config: {
           content:
-            "The dashboard is generaterd based on pinned pytorch with latest vllm, powered by pytorch-integration-testing [workflow](https://github.com/pytorch/pytorch-integration-testing/actions/workflows/vllm-benchmark.yml)",
+            "vLLM V1 Benchmark Dashboard - Compare performance metrics across commits",
         },
       },
       {
@@ -174,14 +170,11 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
               applyFilterFields: ["model", "device", "arch"],
             },
           },
-          extraMetadata: COMPARISON_TABLE_METADATA_COLUMNS,
+          extraMetadata: METADATA_COLUMNS,
           comparisonPolicy: COMPARISON_POLICY_BOOK,
           renderOptions: {
             missingText: "none",
             bothMissingText: "",
-            flex: {
-              primary: 2,
-            },
           },
         },
       },
