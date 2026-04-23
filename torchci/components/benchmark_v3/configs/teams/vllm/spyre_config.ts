@@ -5,9 +5,8 @@ import {
   DEFAULT_DASHBOARD_BENCHMARK_INITIAL,
 } from "../defaults/default_dashboard_config";
 
-export const VLLM_BENCHMARK_ID = "vllm_benchmark";
+export const SPYRE_E2E_BENCHMARK_ID = "spyre_e2e_benchmark";
 
-// Comparison policies for time-based metrics (lower is better)
 const TIME_METRIC_POLICY: BenchmarkComparisonPolicyConfig = {
   target: "time_metric",
   type: "ratio",
@@ -21,13 +20,7 @@ const TIME_METRIC_POLICY: BenchmarkComparisonPolicyConfig = {
 const COMPARISON_POLICY_BOOK = {
   latency: TIME_METRIC_POLICY,
   median_latency_ms: TIME_METRIC_POLICY,
-  median_ttft_ms: TIME_METRIC_POLICY,
-  median_tpot_ms: TIME_METRIC_POLICY,
-  median_itl_ms: TIME_METRIC_POLICY,
-  p99_ttft_ms: TIME_METRIC_POLICY,
-  p99_tpot_ms: TIME_METRIC_POLICY,
-  p99_itl_ms: TIME_METRIC_POLICY,
-  requests_per_second: TIME_METRIC_POLICY,
+  p99_latency_ms: TIME_METRIC_POLICY,
 };
 
 const METADATA_COLUMNS = [
@@ -44,10 +37,6 @@ const METADATA_COLUMNS = [
     displayName: "Use Compile",
   },
   {
-    field: "extra_key.request_rate",
-    displayName: "Request Rate",
-  },
-  {
     field: "extra_key.tensor_parallel_size",
     displayName: "Tensor Parallel",
   },
@@ -61,15 +50,15 @@ const METADATA_COLUMNS = [
   },
 ] as const;
 
-export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
-  benchmarkId: VLLM_BENCHMARK_ID,
-  apiId: VLLM_BENCHMARK_ID,
-  title: "VLLM V1 Benchmark",
+export const SpyreE2eBenchmarkDashboardConfig: BenchmarkUIConfig = {
+  benchmarkId: SPYRE_E2E_BENCHMARK_ID,
+  apiId: SPYRE_E2E_BENCHMARK_ID,
+  title: "Spyre E2E Benchmark",
   type: "dashboard",
   dataBinding: {
     initial: {
       ...DEFAULT_DASHBOARD_BENCHMARK_INITIAL,
-      benchmarkId: VLLM_BENCHMARK_ID,
+      benchmarkId: SPYRE_E2E_BENCHMARK_ID,
       lbranch: "main",
       rbranch: "main",
       filters: {},
@@ -93,7 +82,7 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
             type: "AutoBenchmarkMarkDownContent",
             config: {
               content:
-                "vLLM V1 Benchmark Dashboard - Compare performance metrics across commits",
+                "IBM Spyre E2E Benchmark Dashboard - Compare vLLM performance on Spyre accelerators",
             },
           },
           {
@@ -105,7 +94,6 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
               lineKey: [
                 "model",
                 "extra_key.use_compile",
-                "extra_key.request_rate",
                 "extra_key.input_len",
                 "extra_key.output_len",
                 "metric",
@@ -150,7 +138,7 @@ export const VllmBenchmarkDashboardConfig: BenchmarkUIConfig = {
         type: "AutoBenchmarkMarkDownContent",
         config: {
           content:
-            "vLLM V1 Benchmark Dashboard - Compare performance metrics across commits",
+            "IBM Spyre E2E Benchmark Dashboard - Compare vLLM performance on Spyre accelerators",
         },
       },
       {

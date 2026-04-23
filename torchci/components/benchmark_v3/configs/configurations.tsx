@@ -32,6 +32,10 @@ import {
   VllmBenchmarkDashboardConfig,
 } from "./teams/vllm/config";
 import {
+  SPYRE_E2E_BENCHMARK_ID,
+  SpyreE2eBenchmarkDashboardConfig,
+} from "./teams/vllm/spyre_config";
+import {
   PYTORCH_X_VLLM_AGGREGATE_BENCHMARK_ID,
   VllmXPytorchBenchmarkAggregatedConfig,
 } from "./teams/vllm/pytoch_x_vllm_agg_config";
@@ -71,6 +75,9 @@ export const PREDEFINED_BENCHMARK_CONFIG: BenchmarkConfigMap = {
   },
   [VLLM_BENCHMARK_ID]: {
     [BenchmarkPageType.DashboardPage]: VllmBenchmarkDashboardConfig,
+  },
+  [SPYRE_E2E_BENCHMARK_ID]: {
+    [BenchmarkPageType.DashboardPage]: SpyreE2eBenchmarkDashboardConfig,
   },
   [PYTORCH_GPTFAST_BENCHMARK_ID]: {
     [BenchmarkPageType.DashboardPage]: PytorchGptFastBenchmarkDashboardConfig,
@@ -117,6 +124,11 @@ export const BENCHMARK_ID_MAPPING: Record<string, BenchmarkIdMappingItem> = {
     id: VLLM_BENCHMARK_ID,
     repoName: "vllm-project/vllm",
     benchmarkName: "vllm_benchmark",
+  },
+  [SPYRE_E2E_BENCHMARK_ID]: {
+    id: SPYRE_E2E_BENCHMARK_ID,
+    repoName: "ibm/vllm-spyre",
+    benchmarkName: "spyre_e2e_benchmark",
   },
   [PYTORCH_GPTFAST_BENCHMARK_ID]: {
     id: PYTORCH_GPTFAST_BENCHMARK_ID,
@@ -265,6 +277,24 @@ export const BENCHMARK_CATEGORIES: BenchmarkCategoryGroup[] = [
           {
             label: "legacy dashboard",
             href: "/benchmark/llms?repoName=vllm-project%2Fvllm",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Spyre Benchmarks",
+    tags: ["repo:ibm/vllm-spyre"],
+    subtitle: "vLLM benchmarks on IBM Spyre accelerators",
+    items: [
+      {
+        name: "Spyre E2E Benchmark",
+        route: `/benchmark/v3/dashboard/${SPYRE_E2E_BENCHMARK_ID}`,
+        info: "vLLM inference benchmarks on IBM Spyre PF accelerators",
+        actions: [
+          {
+            label: "Dashboard",
+            href: `/benchmark/v3/dashboard/${SPYRE_E2E_BENCHMARK_ID}`,
           },
         ],
       },
