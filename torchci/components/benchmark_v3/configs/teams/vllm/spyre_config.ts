@@ -61,7 +61,11 @@ export const SpyreE2eBenchmarkDashboardConfig: BenchmarkUIConfig = {
       benchmarkId: SPYRE_E2E_BENCHMARK_ID,
       lbranch: "main",
       rbranch: "main",
-      filters: {},
+      filters: {
+        device: "spyre",
+        arch: "IBM Spyre",
+        deviceName: "spyre||IBM Spyre",
+      },
     },
     required_filter_fields: [],
   },
