@@ -412,3 +412,47 @@ export class VllmAggregateBenchmarkMetadataFetcher
     return this._data_query.toQueryParams(inputs);
   }
 }
+
+export class SpyreBenchmarkMetadataFetcher
+  extends ExecutableQueryBase
+  implements BenchmarkMetadataFetcher
+{
+  private _data_query: BenchmarkMetadataQuery;
+
+  constructor() {
+    super();
+    this._data_query = new BenchmarkMetadataQuery();
+  }
+
+  postProcess(data: any[]) {
+    let li = getDefaultBenchmarkMetadataGroup(data);
+
+    // Remove Backend, Mode, and DType filters (not applicable to Spyre)
+    li = li.filter(
+      (item) =>
+        item.type !== BenchmarkMetadataType.BackendName &&
+        item.type !== BenchmarkMetadataType.ModeName &&
+        item.type !== BenchmarkMetadataType.DtypeName
+    );
+
+    // Remove the default "all" option for device
+    const deviceItem = li.find(
+      (item) => item.type === BenchmarkMetadataType.DeviceName
+    );
+    if (deviceItem && deviceItem.options.length > 0) {
+      deviceItem.options = deviceItem.options.filter((opt) => opt.value !== "");
+      if (deviceItem.options.length > 0) {
+        deviceItem.initialValue = deviceItem.options[0].value;
+      }
+    }
+    return li;
+  }
+
+  build() {
+    return this._data_query.build();
+  }
+
+  toQueryParams(inputs: any) {
+    return this._data_query.toQueryParams(inputs);
+  }
+}

@@ -17,10 +17,22 @@ const TIME_METRIC_POLICY: BenchmarkComparisonPolicyConfig = {
   },
 };
 
+const THROUGHPUT_METRIC_POLICY: BenchmarkComparisonPolicyConfig = {
+  target: "throughput_metric",
+  type: "ratio",
+  ratioPolicy: {
+    badRatio: 0.8,
+    goodRatio: 1.2,
+    direction: "up",
+  },
+};
+
 const COMPARISON_POLICY_BOOK = {
   latency: TIME_METRIC_POLICY,
   median_latency_ms: TIME_METRIC_POLICY,
   p99_latency_ms: TIME_METRIC_POLICY,
+  tokens_per_second: THROUGHPUT_METRIC_POLICY,
+  requests_per_second: THROUGHPUT_METRIC_POLICY,
 };
 
 const METADATA_COLUMNS = [

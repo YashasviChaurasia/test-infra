@@ -716,3 +716,58 @@ export class VllmBenchmarkDataFetcher
     return this._data_query.build();
   }
 }
+
+/**
+ * Builder to get Spyre E2E Benchmark data
+ * Similar to VllmBenchmarkDataFetcher but without the use_compile='true' filter
+ */
+export class SpyreBenchmarkDataFetcher
+  extends ExecutableQueryBase
+  implements BenchmarkDataFetcher
+{
+  private _data_query: BenchmarkDataQuery;
+  constructor() {
+    super();
+    this._data_query = new BenchmarkDataQuery();
+    this._data_query.addExtraInfos(
+      new Map([
+        [
+          "use_compile",
+          `tupleElement(o.benchmark, 'extra_info')['use_compile']`,
+        ],
+        [
+          "tensor_parallel_size",
+          `tupleElement(o.benchmark, 'extra_info')['tensor_parallel_size']`,
+        ],
+        [
+          "input_len",
+          `tupleElement(o.benchmark, 'extra_info')['input_len']`,
+        ],
+        [
+          "output_len",
+          `tupleElement(o.benchmark, 'extra_info')['output_len']`,
+        ],
+        [
+          "hardware_type",
+          `tupleElement(o.benchmark, 'extra_info')['hardware_type']`,
+        ],
+      ])
+    );
+  }
+  applyFormat(
+    data: any[],
+    formats: string[],
+    includesAllExtraKey: boolean = true,
+    _groupByFields?: string[]
+  ) {
+    return this._data_query.applyFormat(data, formats, includesAllExtraKey);
+  }
+
+  toQueryParams(inputs: any, id?: string): Record<string, any> {
+    return this._data_query.toQueryParams(inputs, id);
+  }
+
+  build() {
+    return this._data_query.build();
+  }
+}
