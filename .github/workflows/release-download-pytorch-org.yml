@@ -24,6 +24,7 @@ on:
           - torchcodec
           - torchcomms
           - torch_tensorrt
+          - torch_tensorrt_rtx
           - torchrec
           - fbgemm_gpu
           - fbgemm_gpu_genai
@@ -61,6 +62,7 @@ jobs:
             cd release
             # Install requirements
             pip install awscli==1.32.18
+            pip install -r ../s3_management/requirements.txt
 
             promote_s3() {
               local package_name

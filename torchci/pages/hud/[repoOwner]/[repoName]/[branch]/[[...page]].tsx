@@ -1,3 +1,7 @@
+import AutorevertToggle, {
+  isAutorevertActive,
+} from "components/autorevert/AutorevertToggle";
+import AutorevertView from "components/autorevert/AutorevertView";
 import CheckBoxSelector from "components/common/CheckBoxSelector";
 import CopyLink from "components/common/CopyLink";
 import LoadingPage from "components/common/LoadingPage";
@@ -15,8 +19,15 @@ import JobConclusion from "components/job/JobConclusion";
 import JobFilterInput from "components/job/JobFilterInput";
 import JobTooltip from "components/job/JobTooltip";
 import SettingsPanel from "components/SettingsPanel";
+import {
+  AdvisorVerdict,
+  AdvisorVerdictRow,
+  buildVerdictsBySha,
+  deduplicateVerdicts,
+  matchVerdictToJob,
+} from "lib/advisorVerdictUtils";
 import { isJobAutorevertSignal } from "lib/autorevertUtils";
-import { fetcher } from "lib/GeneralUtils";
+import { fetcher, useClickHouseAPIImmutable } from "lib/GeneralUtils";
 import {
   getGroupingData,
   groups,
@@ -41,6 +52,7 @@ import {
 } from "lib/types";
 import {
   useGroupingPreference,
+  useHideAlwaysSkippedPreference,
   useHideGreenColumnsPreference,
   useHideNonViableStrictPreference,
   useMonsterFailuresPreference,
@@ -56,6 +68,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import useSWR from "swr";
@@ -76,6 +89,14 @@ export function JobCell({
   repoName?: string;
 }) {
   const [pinnedId, setPinnedId] = useContext(PinnedTooltipContext);
+  const advisorVerdictsBySha = useContext(AdvisorVerdictsContext);
+
+  // Match AI advisor verdict to this job cell (only show on failed jobs)
+  const verdictsForSha = advisorVerdictsBySha.get(sha);
+  const advisorVerdict =
+    verdictsForSha && isFailedJob(job)
+      ? matchVerdictToJob(job.name ?? "", verdictsForSha, job.failureCaptures)
+      : undefined;
 
   // Build cell style classes
   const cellClasses = [];
@@ -84,6 +105,9 @@ export function JobCell({
   }
   if (isAutorevertSignal) {
     cellClasses.push(styles.autorevertSignal);
+  }
+  if (advisorVerdict) {
+    cellClasses.push(styles.advisorVerdict);
   }
   const cellStyle = cellClasses.join(" ");
 
@@ -97,6 +121,7 @@ export function JobCell({
             job={job}
             sha={pinnedId.sha || sha}
             isAutorevertSignal={isAutorevertSignal}
+            advisorVerdict={advisorVerdict}
             repoOwner={repoOwner}
             repoName={repoName}
           />
@@ -116,6 +141,20 @@ export function JobCell({
             }
             jobData={job}
           />
+          {advisorVerdict && (
+            <div
+              className={`${styles.advisorBadge} ${
+                styles[
+                  `advisorVerdict_${advisorVerdict.verdict}` as keyof typeof styles
+                ] ?? ""
+              }`}
+              title={`AI: ${advisorVerdict.verdict} (${Math.round(
+                advisorVerdict.confidence * 100
+              )}%)`}
+            >
+              ai
+            </div>
+          )}
         </div>
       </TooltipTarget>
     </td>
@@ -344,71 +383,113 @@ function FiltersAndSettings({}: {}) {
   const params = packHudParams(router.query);
   const { jobFilter, handleSubmit } = useTableFilter(params);
   const [mergeEphemeralLF, setMergeEphemeralLF] = useContext(MergeLFContext);
+  const [mergeOSDC, setMergeOSDC] = useContext(MergeOSDCContext);
+  const [autorevertView, setAutorevertView] = useContext(AutorevertViewContext);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [hideUnstable, setHideUnstable] = usePreference("hideUnstable");
   const [hideGreenColumns, setHideGreenColumns] =
     useHideGreenColumnsPreference();
   const [hideNonViableStrict, setHideNonViableStrict] =
     useHideNonViableStrictPreference();
+  const [hideAlwaysSkipped, setHideAlwaysSkipped] =
+    useHideAlwaysSkippedPreference();
   const [useGrouping, setUseGrouping] = useGroupingPreference(
     params.nameFilter
   );
 
+  // Only show autorevert toggle for pytorch/pytorch main
+  const isPyTorchMain =
+    params.repoOwner === "pytorch" &&
+    params.repoName === "pytorch" &&
+    params.branch === "main";
+
   return (
     <div className={styles.hudControlsRow}>
-      <JobFilterInput currentFilter={jobFilter} handleSubmit={handleSubmit} />
-      <SettingsPanel
-        settingGroups={{
-          // You need to specify both checkBoxName and key for each setting.
-          // `checkbox name` is used by CheckBoxSelector while `key` is
-          // used to uniquely identify the component in the settings panel.
-          // As far as I can CheckBoxSelector cannot read or write `key` but
-          // React requires us to set key since it's a list element, so we
-          // end up with some unfortunate duplication.
-          "View Options": [
-            <CheckBoxSelector
-              value={useGrouping}
-              setValue={(value) => setUseGrouping(value)}
-              checkBoxName="groupView"
-              key="groupView"
-              labelText={"Use grouped view"}
-            />,
-            <MonsterFailuresCheckbox key="monsterFailures" />,
-          ],
-          "Filter Options": [
-            <CheckBoxSelector
-              value={hideUnstable}
-              setValue={(value) => setHideUnstable(value)}
-              checkBoxName="hideUnstable"
-              key="hideUnstable"
-              labelText={"Hide unstable jobs"}
-            />,
-            <CheckBoxSelector
-              value={hideGreenColumns}
-              setValue={(value) => setHideGreenColumns(value)}
-              checkBoxName="hideGreenColumns"
-              key="hideGreenColumns"
-              labelText={"Hide green columns"}
-            />,
-            <CheckBoxSelector
-              value={hideNonViableStrict}
-              setValue={(value) => setHideNonViableStrict(value)}
-              checkBoxName="hideNonViableStrict"
-              key="hideNonViableStrict"
-              labelText={"Hide non-viable-strict jobs"}
-            />,
-            <CheckBoxSelector
-              value={mergeEphemeralLF}
-              setValue={setMergeEphemeralLF}
-              checkBoxName="mergeEphemeralLF"
-              key="mergeEphemeralLF"
-              labelText={"Condense LF, ephemeral jobs"}
-            />,
-          ],
-        }}
-        isOpen={settingsPanelOpen}
-        onToggle={() => setSettingsPanelOpen(!settingsPanelOpen)}
-      />
+      {!autorevertView && (
+        <>
+          <JobFilterInput
+            currentFilter={jobFilter}
+            handleSubmit={handleSubmit}
+          />
+          <SettingsPanel
+            settingGroups={{
+              // You need to specify both checkBoxName and key for each setting.
+              // `checkbox name` is used by CheckBoxSelector while `key` is
+              // used to uniquely identify the component in the settings panel.
+              // As far as I can CheckBoxSelector cannot read or write `key` but
+              // React requires us to set key since it's a list element, so we
+              // end up with some unfortunate duplication.
+              "View Options": [
+                <CheckBoxSelector
+                  value={useGrouping}
+                  setValue={(value) => setUseGrouping(value)}
+                  checkBoxName="groupView"
+                  key="groupView"
+                  labelText={"Use grouped view"}
+                />,
+                <MonsterFailuresCheckbox key="monsterFailures" />,
+              ],
+              "Filter Options": [
+                <CheckBoxSelector
+                  value={hideUnstable}
+                  setValue={(value) => setHideUnstable(value)}
+                  checkBoxName="hideUnstable"
+                  key="hideUnstable"
+                  labelText={"Hide unstable jobs"}
+                />,
+                <CheckBoxSelector
+                  value={hideGreenColumns}
+                  setValue={(value) => setHideGreenColumns(value)}
+                  checkBoxName="hideGreenColumns"
+                  key="hideGreenColumns"
+                  labelText={"Hide green columns"}
+                />,
+                <CheckBoxSelector
+                  value={hideNonViableStrict}
+                  setValue={(value) => setHideNonViableStrict(value)}
+                  checkBoxName="hideNonViableStrict"
+                  key="hideNonViableStrict"
+                  labelText={"Hide non-viable-strict jobs"}
+                />,
+                <CheckBoxSelector
+                  value={hideAlwaysSkipped}
+                  setValue={(value) => setHideAlwaysSkipped(value)}
+                  checkBoxName="hideAlwaysSkipped"
+                  key="hideAlwaysSkipped"
+                  labelText={"Hide always-skipped jobs"}
+                />,
+                <CheckBoxSelector
+                  value={mergeEphemeralLF}
+                  setValue={setMergeEphemeralLF}
+                  checkBoxName="mergeEphemeralLF"
+                  key="mergeEphemeralLF"
+                  labelText={"Condense LF, ephemeral jobs"}
+                />,
+                <CheckBoxSelector
+                  value={mergeOSDC}
+                  setValue={setMergeOSDC}
+                  checkBoxName="mergeOSDC"
+                  key="mergeOSDC"
+                  labelText={"Condense OSDC, non-OSDC jobs"}
+                />,
+              ],
+            }}
+            isOpen={settingsPanelOpen}
+            onToggle={() => setSettingsPanelOpen(!settingsPanelOpen)}
+          />
+        </>
+      )}
+      {isPyTorchMain && (
+        <AutorevertToggle
+          active={autorevertView}
+          onToggle={setAutorevertView}
+          repoOwner={params.repoOwner}
+          repoName={params.repoName}
+          branch={params.branch}
+          page={params.page}
+          per_page={params.per_page}
+        />
+      )}
     </div>
   );
 }
@@ -416,6 +497,11 @@ function FiltersAndSettings({}: {}) {
 export const MonsterFailuresContext = createContext<
   [boolean, ((_value: boolean) => void) | undefined]
 >([false, undefined]);
+
+// AI Advisor verdicts context: sha -> verdicts[]
+export const AdvisorVerdictsContext = createContext<
+  Map<string, AdvisorVerdict[]>
+>(new Map());
 
 export const GroupingContext = createContext<{
   groupNameMapping: Map<string, Array<string>>;
@@ -491,12 +577,33 @@ export const MergeLFContext = createContext<[boolean, (val: boolean) => void]>([
   (_) => {},
 ]);
 
+export const MergeOSDCContext = createContext<
+  [boolean, (val: boolean) => void]
+>([false, (_) => {}]);
+
+export const AutorevertViewContext = createContext<
+  [boolean, (val: boolean) => void]
+>([false, (_) => {}]);
+
 export default function Hud() {
   const router = useRouter();
   const [mergeEphemeralLF, setMergeEphemeralLF] = usePreference("mergeLF");
+  const [mergeOSDC, setMergeOSDC] = usePreference(
+    "mergeOSDC",
+    /*override*/ undefined,
+    /*default*/ false
+  );
+  const [autorevertView, setAutorevertView] = useState(() =>
+    isAutorevertActive(router.query)
+  );
+  // Sync autorevert state when route changes (e.g. clicking "home")
+  useEffect(() => {
+    setAutorevertView(isAutorevertActive(router.query));
+  }, [router.query]);
   const params = packHudParams({
     ...router.query,
     mergeEphemeralLF: mergeEphemeralLF,
+    mergeOSDC: mergeOSDC,
   });
 
   // Logic to handle tooltip pinning. The behavior we want is:
@@ -544,26 +651,41 @@ export default function Hud() {
           <MergeLFContext.Provider
             value={[mergeEphemeralLF, setMergeEphemeralLF]}
           >
-            {params.branch !== undefined && (
-              <div onClick={handleClick}>
-                <div style={{ display: "flex", alignItems: "flex-end" }}>
-                  <HudHeader params={params} />
-                  <CopyPermanentLink
-                    params={params}
-                    style={{ marginLeft: "10px" }}
-                  />
-                </div>
-                <div style={{ position: "relative", clear: "both" }}>
-                  <FiltersAndSettings />
-                  <GroupedHudTable params={params} />
-                </div>
-                <PageSelector params={params} baseUrl="hud" />
-                <br />
-                <div>
-                  <em>This page automatically updates.</em>
-                </div>
-              </div>
-            )}
+            <MergeOSDCContext.Provider value={[mergeOSDC, setMergeOSDC]}>
+              <AutorevertViewContext.Provider
+                value={[autorevertView, setAutorevertView]}
+              >
+                {params.branch !== undefined && (
+                  <div onClick={handleClick}>
+                    <div style={{ display: "flex", alignItems: "flex-end" }}>
+                      <HudHeader params={params} />
+                      <CopyPermanentLink
+                        params={params}
+                        style={{ marginLeft: "10px" }}
+                        autorevertView={autorevertView}
+                      />
+                    </div>
+                    <div style={{ position: "relative", clear: "both" }}>
+                      <FiltersAndSettings />
+                      {autorevertView ? (
+                        <AutorevertView />
+                      ) : (
+                        <GroupedHudTable params={params} />
+                      )}
+                    </div>
+                    {!autorevertView && (
+                      <>
+                        <PageSelector params={params} baseUrl="hud" />
+                        <br />
+                        <div>
+                          <em>This page automatically updates.</em>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </AutorevertViewContext.Provider>
+            </MergeOSDCContext.Provider>
           </MergeLFContext.Provider>
         </MonsterFailuresProvider>
       </PinnedTooltipContext.Provider>
@@ -589,17 +711,27 @@ function useLatestCommitSha(params: HudParams) {
 function CopyPermanentLink({
   params,
   style,
+  autorevertView,
 }: {
   params: HudParams;
   style?: React.CSSProperties;
+  autorevertView?: boolean;
 }) {
+  // Hook must be called unconditionally (React rules of hooks)
+  const latestCommitSha = useLatestCommitSha(params);
+
+  // In autorevert view, copy the current URL which has all ar_* params
+  if (autorevertView) {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    return <CopyLink textToCopy={url} compressed={false} style={style} />;
+  }
+
   // Branch and tag pointers can change over time.
   // For a permanent, we take the latest immutable commit as our reference
-  const latestCommitSha = useLatestCommitSha(params);
   if (latestCommitSha === null) {
     return <></>;
   }
-  let permaParams = { ...params, branch: latestCommitSha };
+  const permaParams = { ...params, branch: latestCommitSha };
 
   const domain = window.location.origin;
   const path = formatHudUrlForRoute("hud", permaParams);
@@ -622,9 +754,25 @@ function GroupedHudTable({ params }: { params: HudParams }) {
     data?.flatMap((row) => Array.from(row.nameToJobs.keys()))
   );
 
+  // Lazy-load AI advisor verdicts for commits on screen
+  const shas = useMemo(() => data?.map((row) => row.sha) ?? [], [data]);
+  const { data: advisorRows } = useClickHouseAPIImmutable<AdvisorVerdictRow>(
+    "advisor_verdicts_for_hud",
+    {
+      repo: `${params.repoOwner}/${params.repoName}`,
+      shas: shas,
+    },
+    shas.length > 0
+  );
+  const advisorVerdictsBySha = useMemo(() => {
+    if (!advisorRows || advisorRows.length === 0) return new Map();
+    return buildVerdictsBySha(deduplicateVerdicts(advisorRows));
+  }, [advisorRows]);
+
   const [hideUnstable] = usePreference("hideUnstable");
   const [hideGreenColumns] = useHideGreenColumnsPreference();
   const [hideNonViableStrict] = useHideNonViableStrictPreference();
+  const [hideAlwaysSkipped] = useHideAlwaysSkippedPreference();
   const [useGrouping] = useGroupingPreference(params.nameFilter);
 
   const {
@@ -632,6 +780,8 @@ function GroupedHudTable({ params }: { params: HudParams }) {
     groupNameMapping,
     jobsWithFailures,
     groupsWithFailures,
+    jobsAlwaysSkipped,
+    groupsAlwaysSkipped,
     jobsViableStrictBlocking,
     groupsViableStrictBlocking,
   } = getGroupingData(
@@ -715,6 +865,17 @@ function GroupedHudTable({ params }: { params: HudParams }) {
       }
     }
 
+    // If hiding always-skipped jobs, drop columns where every recorded run was skipped
+    if (hideAlwaysSkipped) {
+      if (groupNameMapping.has(name)) {
+        if (groupsAlwaysSkipped.has(name)) {
+          return false;
+        }
+      } else if (jobsAlwaysSkipped.has(name)) {
+        return false;
+      }
+    }
+
     // If hiding green columns, filter out names that don't have any failed jobs
     if (hideGreenColumns) {
       // For group names, check if any job in the group has failures
@@ -746,20 +907,22 @@ function GroupedHudTable({ params }: { params: HudParams }) {
   }
 
   return (
-    <GroupingContext.Provider
-      value={{ groupNameMapping, expandedGroups, setExpandedGroups }}
-    >
-      <table className={styles.hudTable} style={{ overflow: "auto" }}>
-        <GroupHudTableColumns names={names} />
-        <GroupHudTableHeader names={names} />
-        <HudTableBody
-          shaGrid={shaGrid}
-          names={names}
-          unstableIssues={unstableIssuesData ?? []}
-          repoOwner={params.repoOwner}
-          repoName={params.repoName}
-        />
-      </table>
-    </GroupingContext.Provider>
+    <AdvisorVerdictsContext.Provider value={advisorVerdictsBySha}>
+      <GroupingContext.Provider
+        value={{ groupNameMapping, expandedGroups, setExpandedGroups }}
+      >
+        <table className={styles.hudTable} style={{ overflow: "auto" }}>
+          <GroupHudTableColumns names={names} />
+          <GroupHudTableHeader names={names} />
+          <HudTableBody
+            shaGrid={shaGrid}
+            names={names}
+            unstableIssues={unstableIssuesData ?? []}
+            repoOwner={params.repoOwner}
+            repoName={params.repoName}
+          />
+        </table>
+      </GroupingContext.Provider>
+    </AdvisorVerdictsContext.Provider>
   );
 }

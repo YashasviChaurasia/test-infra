@@ -1,6 +1,6 @@
 data "amazon-ami" "windows_root_ami" {
   filters = {
-    name                = "Windows_Server-2019-English-Tesla-*"
+    name                = "Windows_Server-2019-English-Full-Base-*"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
   }
@@ -15,6 +15,8 @@ locals {
 
 source "amazon-ebs" "windows_ebs_builder" {
   ami_name                    = "Windows 2019 GHA CI - ${local.timestamp}"
+  ami_groups                  = ["all"]
+  snapshot_groups             = ["all"]
   associate_public_ip_address = true
   communicator                = "winrm"
   instance_type               = "g5.4xlarge"

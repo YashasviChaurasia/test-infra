@@ -118,7 +118,7 @@ describe("auto-label-bot", () => {
       .reply(200)
       .post("/repos/zhouzhuojie/gha-ci-playground/issues/31/labels", (body) => {
         expect(body).toMatchObject({
-          labels: ["ciflow/rocm-mi300", "module: rocm"],
+          labels: ["module: rocm"],
         });
         return true;
       })
@@ -133,6 +133,48 @@ describe("auto-label-bot", () => {
 
     scope.done();
     handleScope(checkLabelsScope);
+  });
+
+  test("add ciflow/rocm label when non pytorch/pytorch PR title contains ROCm", async () => {
+    // Reset mock to return false for isPyTorchPyTorch
+    jest.restoreAllMocks();
+    const mock = jest.spyOn(botUtils, "isPyTorchPyTorch");
+    mock.mockReturnValue(false);
+    const mockbotSupportedOrg = jest.spyOn(
+      botUtils,
+      "isPyTorchbotSupportedOrg"
+    );
+    mockbotSupportedOrg.mockReturnValue(true);
+
+    nock("https://api.github.com")
+      .post("/app/installations/2/access_tokens")
+      .reply(200, { token: "test" });
+
+    const payload = requireDeepCopy("./fixtures/pull_request.opened")[
+      "payload"
+    ];
+    payload["pull_request"]["title"] = "Issue regarding ROCm";
+    payload["pull_request"]["labels"] = [];
+
+    const scope = nock("https://api.github.com")
+      .get("/repos/zhouzhuojie/gha-ci-playground/pulls/31/files?per_page=100")
+      .reply(200)
+      .post("/repos/zhouzhuojie/gha-ci-playground/issues/31/labels", (body) => {
+        expect(body).toMatchObject({
+          labels: ["module: rocm", "ciflow/rocm"],
+        });
+        return true;
+      })
+      .reply(200);
+    // Check-labels will post a comment since rocm labels are not required labels
+    const checkLabelsScope = mockCheckLabelsComment(
+      "zhouzhuojie/gha-ci-playground",
+      31
+    );
+
+    await probot.receive({ name: "pull_request", payload: payload, id: "2" });
+
+    scope.done();
   });
 
   test("add ci-no-td label when PR title contains Reland", async () => {
@@ -1120,7 +1162,9 @@ describe("auto-label-bot: labeler.yml config", () => {
   });
 
   test("getLabelsFromLabelerConfig multiple match but no workflow permissions", async () => {
-    // Matches both module: dynamo and ciflow/inductor, but removes ciflow due to lacking perms
+    // Matches both module: dynamo and ciflow/inductor. ciflow labels are now
+    // kept even without workflow permissions -- the ciflowPushTrigger will
+    // defer tag creation until workflows are approved.
     const event = requireDeepCopy("./fixtures/pull_request.opened");
     const prFiles = requireDeepCopy("./fixtures/pull_files");
     prFiles["items"] = [{ filename: "torch/_dynamo/blah.py" }];
@@ -1128,22 +1172,8 @@ describe("auto-label-bot: labeler.yml config", () => {
     const prNumber = 31;
     const scope = mockChangedFiles(prFiles, prNumber, repoFullName);
     defaultMockConfig(repoFullName);
-    nock("https://api.github.com")
-      .get((uri) => uri.startsWith(`/repos/${repoFullName}/actions/runs`))
-      .reply(200, {
-        workflow_runs: [
-          {
-            event: "pull_request",
-            conclusion: "action_required",
-          },
-        ],
-      })
-      .get(`/repos/${repoFullName}/collaborators/zzj-bot/permission`)
-      .reply(200, {
-        permission: "read",
-      });
     const scope2 = utils.mockAddLabels(
-      ["module: dynamo"],
+      ["module: dynamo", "ciflow/inductor"],
       repoFullName,
       prNumber
     );

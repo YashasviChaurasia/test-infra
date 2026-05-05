@@ -29,13 +29,13 @@ Switch ($cudaVersion) {
     $toolkitInstaller = "cuda_12.9.1_576.57_windows.exe"
   }
   "13.0" {
-    $cudnn_subfolder="cudnn-windows-x86_64-9.19.0.56_cuda13-archive"
+    $cudnn_subfolder="cudnn-windows-x86_64-9.20.0.48_cuda13-archive"
     $toolkitInstaller = "cuda_13.0.0_windows.exe"
     $installerArgs = ""
   }
   "13.2" {
-    $cudnn_subfolder="cudnn-windows-x86_64-9.19.0.56_cuda13-archive"
-    $toolkitInstaller = "cuda_13.2.0_windows.exe"
+    $cudnn_subfolder="cudnn-windows-x86_64-9.20.0.48_cuda13-archive"
+    $toolkitInstaller = "cuda_13.2.1_windows.exe"
     $installerArgs = ""
   }
 }
@@ -106,6 +106,13 @@ function Install-Cudnn() {
   Write-Output "Copying cudnn to $expectedInstallLocation"
 
   Copy-Item -Force -Verbose -Recurse "$tmpCudnnExtracted\$cudnn_subfolder\bin\*" "$expectedInstallLocation\bin"
+  # Newer cuDNN archives place DLLs under bin\x64\. Flatten them into bin\
+  # so they are found via PATH (which only includes bin\, not bin\x64\).
+  # Mirrors the same step in pytorch/pytorch:.ci/pytorch/windows/internal/cuda_install.bat.
+  $cudnnBinX64 = "$tmpCudnnExtracted\$cudnn_subfolder\bin\x64"
+  if (Test-Path -Path $cudnnBinX64 -PathType Container) {
+    Copy-Item -Force -Verbose "$cudnnBinX64\*.*" "$expectedInstallLocation\bin"
+  }
   Copy-Item -Force -Verbose -Recurse "$tmpCudnnExtracted\$cudnn_subfolder\$cudnn_lib_folder\x64\*" "$expectedInstallLocation\lib\x64"
   Copy-Item -Force -Verbose -Recurse "$tmpCudnnExtracted\$cudnn_subfolder\include\*" "$expectedInstallLocation\include"
 

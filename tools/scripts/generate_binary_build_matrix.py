@@ -6,7 +6,7 @@ Important. After making changes to this file please run following command:
 python -m tools.tests.test_generate_binary_build_matrix --update-reference-files
 
 Will output a condensed version of the matrix if on a pull request that only
-includes the latest version of python we support built on four different
+includes the oldest version of python we support built on four different
 architectures:
     * CPU
     * Latest CUDA
@@ -35,8 +35,8 @@ MACOS_PYTHON_POINT_VERSIONS = {
     "3.14": "3.14.3",
 }
 CUDA_ARCHES_DICT = {
-    "nightly": ["12.6", "12.8", "13.0"],
-    "test": ["12.6", "12.8", "13.0"],
+    "nightly": ["12.6", "13.0", "13.2"],
+    "test": ["12.6", "13.0", "13.2"],
     "release": ["12.6", "12.8", "13.0"],
 }
 
@@ -49,8 +49,8 @@ ROCM_ARCHES_DICT = {
 CUDA_CUDNN_VERSIONS = {
     "12.6": {"cuda": "12.6.3", "cudnn": "9"},
     "12.8": {"cuda": "12.8.0", "cudnn": "9"},
-    "12.9": {"cuda": "12.9.1", "cudnn": "9"},
     "13.0": {"cuda": "13.0.0", "cudnn": "9"},
+    "13.2": {"cuda": "13.2.0", "cudnn": "9"},
 }
 
 STABLE_CUDA_VERSIONS = {
@@ -59,7 +59,7 @@ STABLE_CUDA_VERSIONS = {
     "release": "13.0",
 }
 
-CUDA_AARCH64_ARCHES = ["12.6-aarch64", "12.8-aarch64", "13.0-aarch64"]
+CUDA_AARCH64_ARCHES = ["12.6-aarch64", "13.0-aarch64", "13.2-aarch64"]
 
 PACKAGE_TYPES = ["wheel", "libtorch"]
 CXX11_ABI = "cxx11-abi"
@@ -84,8 +84,8 @@ ROCM = "rocm"
 XPU = "xpu"
 
 
-CURRENT_NIGHTLY_VERSION = "2.12.0"
-CURRENT_CANDIDATE_VERSION = "2.11.0"
+CURRENT_NIGHTLY_VERSION = "2.13.0"
+CURRENT_CANDIDATE_VERSION = "2.12.0"
 CURRENT_STABLE_VERSION = "2.11.0"
 CURRENT_VERSION = CURRENT_STABLE_VERSION
 
@@ -107,7 +107,7 @@ WIN_CPU_RUNNER = "windows.4xlarge"
 WIN_ARM64_RUNNER = "windows-11-arm64-preview"
 MACOS_M1_RUNNER = "macos-m1-stable"
 
-PACKAGES_TO_INSTALL_WHL = "torch torchvision torchaudio"
+PACKAGES_TO_INSTALL_WHL = "torch torchvision"
 PACKAGES_TO_INSTALL_GETTING_STARTED_WHL = "torch torchvision"
 PACKAGES_TO_INSTALL_WHL_WIN_ARM64 = "torch"
 WHL_INSTALL_BASE = "pip3 install"
@@ -167,15 +167,6 @@ def initialize_globals(
         CURRENT_VERSION = CURRENT_STABLE_VERSION
 
     CUDA_ARCHES = CUDA_ARCHES_DICT[channel]
-    if (
-        channel != "release"
-        and (os == LINUX or os == LINUX_AARCH64)
-        and not getting_started
-    ):
-        # TODO (huydhn): Only build CUDA 12.9 for Linux. This logic is to be cleaned up
-        # in 2.10
-        CUDA_ARCHES.append("12.9")
-        CUDA_AARCH64_ARCHES.append("12.9-aarch64")
     ROCM_ARCHES = ROCM_ARCHES_DICT[channel]
     if build_python_only:
         # Only select the oldest version of python if building a python only package

@@ -20,31 +20,35 @@ jobs:
       matrix:
         include:
           # --- CPU ---
-          - runner: mt-l-x86iamx-8-16
+          - runner: mt-rel-l-x86iavx512-8-64
             platform: linux/amd64
-            base_image: quay.io/pypa/manylinux_2_34_x86_64
+            base_image: quay.io/pypa/manylinux_2_28_x86_64
             install_cuda: ""
             variant_tag: cpu-x86_64
             buildkit_addr: tcp://buildkitd-amd64.buildkit:1234
-          - runner: mt-l-arm64g2-6-32
+            dockerfile: Dockerfile
+          - runner: mt-rel-l-arm64g4-16-62
             platform: linux/arm64
-            base_image: quay.io/pypa/manylinux_2_34_aarch64
+            base_image: quay.io/pypa/manylinux_2_28_aarch64
             install_cuda: ""
             variant_tag: cpu-aarch64
             buildkit_addr: tcp://buildkitd-arm64.buildkit:1234
+            dockerfile: Dockerfile.aarch64
           # --- CUDA (all versions in one image, self-hosted DinD runners) ---
-          - runner: mt-l-x86iamx-8-16
+          - runner: mt-rel-l-x86iavx512-8-64
             platform: linux/amd64
-            base_image: quay.io/pypa/manylinux_2_34_x86_64
+            base_image: quay.io/pypa/manylinux_2_28_x86_64
             install_cuda: "1"
             variant_tag: cuda-x86_64
             buildkit_addr: tcp://buildkitd-amd64.buildkit:1234
-          - runner: mt-l-arm64g2-6-32
+            dockerfile: Dockerfile
+          - runner: mt-rel-l-arm64g4-16-62
             platform: linux/arm64
-            base_image: quay.io/pypa/manylinux_2_34_aarch64
+            base_image: quay.io/pypa/manylinux_2_28_aarch64
             install_cuda: "1"
             variant_tag: cuda-aarch64
             buildkit_addr: tcp://buildkitd-arm64.buildkit:1234
+            dockerfile: Dockerfile.aarch64
     container:
       image: "ghcr.io/actions/actions-runner:latest"
     steps:
@@ -75,12 +79,13 @@ jobs:
             latest=false
           tags: |
             type=sha,prefix=${{ matrix.variant_tag }}-,format=short
-            type=raw,value=${{ matrix.variant_tag }}-latest,enable={{is_default_branch}}
+            type=raw,value=${{ matrix.variant_tag }}-latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./docker
+          file: ./docker/${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags || '' }}

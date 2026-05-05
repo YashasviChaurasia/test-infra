@@ -28,55 +28,41 @@ mkdir -p "$ARTIFACTS_DIR"
 # Install git if needed (required for --patch)
 # ============================================
 if ! command -v git &> /dev/null; then
-    echo "[Bootstrap] Installing git..."
     if command -v apt-get &> /dev/null; then
-        apt-get update -qq && apt-get install -y -qq git 2>&1 | sed 's/^/[Bootstrap] /'
+        apt-get update -qq && apt-get install -y -qq git &>/dev/null
     elif command -v yum &> /dev/null; then
-        yum install -y -q git 2>&1 | sed 's/^/[Bootstrap] /'
+        yum install -y -q git &>/dev/null
     elif command -v apk &> /dev/null; then
-        apk add --quiet git 2>&1 | sed 's/^/[Bootstrap] /'
+        apk add --quiet git &>/dev/null
     elif command -v conda &> /dev/null; then
-        conda install -y -q git 2>&1 | sed 's/^/[Bootstrap] /'
+        conda install -y -q git &>/dev/null
     fi
-    command -v git &> /dev/null && echo "[Bootstrap] ✓ git installed" || echo "[Bootstrap] Warning: git not available"
+    command -v git &> /dev/null || echo "[Bootstrap] Warning: git not available"
 fi
 
 # ============================================
 # Install AWS CLI if needed
 # ============================================
 if ! command -v aws &> /dev/null; then
-    echo "[Bootstrap] Installing AWS CLI..."
-    AWS_INSTALLED=false
+    # Ensure curl and unzip are available
+    for tool in curl unzip; do
+        if ! command -v "$tool" &> /dev/null; then
+            if command -v apt-get &> /dev/null; then
+                apt-get update -qq && apt-get install -y -qq "$tool" &>/dev/null
+            elif command -v yum &> /dev/null; then
+                yum install -y -q "$tool" &>/dev/null
+            elif command -v apk &> /dev/null; then
+                apk add --quiet "$tool" &>/dev/null
+            fi
+        fi
+    done
 
-    # Try pip (works on vanilla python images)
-    if ! $AWS_INSTALLED; then
-        pip install awscli --quiet 2>/dev/null && AWS_INSTALLED=true
-    fi
-    # Try pip3
-    if ! $AWS_INSTALLED; then
-        pip3 install awscli --quiet 2>/dev/null && AWS_INSTALLED=true
-    fi
-    # Try pip with --break-system-packages (PEP 668 managed environments like conda)
-    if ! $AWS_INSTALLED; then
-        pip install awscli --quiet --break-system-packages 2>/dev/null && AWS_INSTALLED=true
-    fi
-    if ! $AWS_INSTALLED; then
-        pip3 install awscli --quiet --break-system-packages 2>/dev/null && AWS_INSTALLED=true
-    fi
-    # Fallback: standalone AWS CLI v2 installer (no pip needed)
-    if ! $AWS_INSTALLED; then
-        echo "[Bootstrap] pip install failed, trying standalone AWS CLI installer..."
-        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip \
-            && python3 -c "import zipfile; zipfile.ZipFile('/tmp/awscliv2.zip').extractall('/tmp/')" \
-            && /tmp/aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli 2>/dev/null \
-            && AWS_INSTALLED=true \
-            || true
-        rm -f /tmp/awscliv2.zip
-    fi
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip \
+        && unzip -q /tmp/awscliv2.zip -d /tmp/ \
+        && /tmp/aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli &>/dev/null
+    rm -f /tmp/awscliv2.zip
 
-    if $AWS_INSTALLED; then
-        echo "[Bootstrap] ✓ AWS CLI installed"
-    else
+    if ! command -v aws &> /dev/null; then
         echo "[Bootstrap] Error: Failed to install AWS CLI"
         exit 1
     fi

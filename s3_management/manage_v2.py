@@ -72,7 +72,7 @@ import time
 from collections import defaultdict
 from os import makedirs, path
 from re import match, sub
-from typing import Dict, Iterable, List, Optional, Set, TypeVar
+from typing import Dict, Iterable, List, Optional, Set, Tuple, TypeVar
 
 import boto3  # type: ignore[import]
 import botocore  # type: ignore[import]
@@ -426,6 +426,8 @@ PT_FOUNDATION_PACKAGES = {
     "fbgemm_gpu",
     "fbgemm_gpu_genai",
     "triton",
+    "triton_rocm",
+    "triton_xpu",
     "pytorch_triton",
     "pytorch_triton_rocm",
     "pytorch_triton_xpu",
@@ -441,6 +443,8 @@ PT_R2_PACKAGES = {
     "fbgemm_gpu",
     "fbgemm_gpu_genai",
     "triton",
+    "triton_rocm",
+    "triton_xpu",
     "pytorch_triton",
     "pytorch_triton_rocm",
     "pytorch_triton_xpu",
@@ -450,10 +454,17 @@ PT_R2_PACKAGES = {
 # These packages will have their URLs point to R2 instead of S3/CloudFront
 # when the path is NOT whl/test and NOT whl/nightly (i.e., prod)
 PT_R2_PACKAGES_PROD = {
+    "torch",
     "torchaudio",
     "torchvision",
     "fbgemm_gpu",
     "fbgemm_gpu_genai",
+    "triton",
+    "triton_rocm",
+    "triton_xpu",
+    "pytorch_triton",
+    "pytorch_triton_rocm",
+    "pytorch_triton_xpu",
 }
 
 # Packages that should have their root index.html copied to subdirectories
@@ -550,6 +561,7 @@ class S3Object:
     checksum: Optional[str]
     size: Optional[int]
     pep658: Optional[str]
+    last_modified: Optional[str] = None
 
     def __hash__(self):
         return hash(self.key)
@@ -840,6 +852,8 @@ class S3Index:
                 pep658_sha = f"sha256={obj.pep658}"
                 # pep714 renames the attribute to data-core-metadata
                 attributes = f' data-dist-info-metadata="{pep658_sha}" data-core-metadata="{pep658_sha}"'
+            if obj.last_modified:
+                attributes += f' data-upload-time="{obj.last_modified}"'
 
             out.append(
                 f'    <a href="{base_url}/{obj.key}{maybe_fragment}"{attributes}>{path.basename(obj.key).replace("%2B", "+")}</a><br/>'
@@ -1321,8 +1335,16 @@ class S3Index:
         CLIENT.put_object_acl(Bucket=BUCKET.name, Key=key, ACL="public-read")
 
     @classmethod
-    def fetch_object_names(cls, prefix: str) -> List[str]:
-        obj_names = []
+    def fetch_object_names(cls, prefix: str) -> List[Tuple[str, Optional[str]]]:
+        obj_names: List[Tuple[str, Optional[str]]] = []
+
+        def _format_last_modified(obj) -> Optional[str]:
+            lm = getattr(obj, "last_modified", None)
+            if lm is None:
+                return None
+            # S3 returns timezone-aware UTC datetimes; emit RFC 3339 with "Z" suffix
+            iso = lm.isoformat()
+            return iso.replace("+00:00", "Z")
 
         # Special handling for source_code prefix - flat structure with only tar.gz files
         if prefix.startswith("source_code"):
@@ -1330,7 +1352,7 @@ class S3Index:
                 # For source_code, we only want files directly in the prefix directory
                 # and they should be tar.gz files matching pytorch-*.tar.gz
                 if path.dirname(obj.key) == prefix and obj.key.endswith(".tar.gz"):
-                    obj_names.append(obj.key)
+                    obj_names.append((obj.key, _format_last_modified(obj)))
             return obj_names
 
         # Original logic for whl and libtorch prefixes
@@ -1351,7 +1373,7 @@ class S3Index:
 
             if not is_acceptable or is_not_accepted:
                 continue
-            obj_names.append(obj.key)
+            obj_names.append((obj.key, _format_last_modified(obj)))
         return obj_names
 
     def fetch_metadata(self) -> None:
@@ -1436,8 +1458,9 @@ class S3Index:
                     checksum=None,
                     size=None,
                     pep658=None,
+                    last_modified=last_modified,
                 )
-                for key in obj_names
+                for key, last_modified in obj_names
             ],
             prefix,
         )
