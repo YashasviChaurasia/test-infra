@@ -6,7 +6,7 @@ SELECT DISTINCT
     workflow_id AS id,
     toStartOfDay(fromUnixTimestamp(timestamp)) AS event_time
 FROM
-    benchmark.oss_ci_benchmark_metadata
+    vllm_benchmarks.run_metadata
 WHERE
     timestamp >= toUnixTimestamp({startTime: DateTime64(3) })
     AND timestamp < toUnixTimestamp({stopTime: DateTime64(3) })

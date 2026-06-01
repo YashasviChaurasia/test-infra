@@ -99,7 +99,7 @@ export class BenchmarkDataQuery extends ExecutableQueryBase {
 
     this._inner_query_builder = new QueryBuilder(
       {
-        table: "benchmark.oss_ci_benchmark_v3 o",
+        table: "vllm_benchmarks.results_v3 o",
         select_exists: true,
         where_exists: true,
         // default select statement for customized query
