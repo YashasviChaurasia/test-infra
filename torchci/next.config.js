@@ -1,6 +1,12 @@
+const path = require("path");
+
 /** @type {import('next').NextConfig} */
 module.exports = {
   reactStrictMode: true,
+  webpack: (config) => {
+    config.resolve.modules = [path.resolve(__dirname), "node_modules"];
+    return config;
+  },
   async rewrites() {
     return [
       {

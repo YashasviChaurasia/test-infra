@@ -27,6 +27,10 @@ export default async function handler(
 
   const { name, query_params, response_formats } = params;
 
+  // Strip trailing 'Z' from timestamps
+  if (query_params.startTime) query_params.startTime = query_params.startTime.replace(/Z$/, '');
+  if (query_params.stopTime) query_params.stopTime = query_params.stopTime.replace(/Z$/, '');
+
   try {
     console.log(`[API v3]get_time_series for benchmark: ${name}`);
 

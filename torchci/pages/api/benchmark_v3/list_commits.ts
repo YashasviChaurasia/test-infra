@@ -42,8 +42,8 @@ export default async function handler(
   const queryParams = {
     repo: repo as string,
     benchmarkName: id as string,
-    startTime: startTime as string,
-    stopTime: stopTime as string,
+    startTime: (startTime as string).replace(/Z$/, ''),
+    stopTime: (stopTime as string).replace(/Z$/, ''),
     branches: branches ? (Array.isArray(branches) ? branches : [branches]) : [],
     models: models ? (Array.isArray(models) ? models : [models]) : [],
     backends: backends ? (Array.isArray(backends) ? backends : [backends]) : [],

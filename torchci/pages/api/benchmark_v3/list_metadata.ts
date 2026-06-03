@@ -26,6 +26,10 @@ export default async function handler(
 
   const { name, query_params } = params;
 
+  // Strip trailing 'Z' from timestamps — ClickHouse DateTime64(3) param binding doesn't handle it
+  if (query_params.startTime) query_params.startTime = query_params.startTime.replace(/Z$/, '');
+  if (query_params.stopTime) query_params.stopTime = query_params.stopTime.replace(/Z$/, '');
+
   try {
     console.log(`[API v3]list_metadata for benchmark: ${name}`);
 
