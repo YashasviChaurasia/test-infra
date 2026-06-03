@@ -1,0 +1,5 @@
+apiVersion: v2
+name: vllm-bench-spyre-dashboard
+description: TorchCI-based vLLM benchmark dashboard with server-side ClickHouse querying
+version: 0.1.0
+appVersion: "1.0.0"

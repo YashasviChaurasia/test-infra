@@ -1,0 +1,37 @@
+namespace: torch-spyre-cicd
+
+image:
+  repository: icr.io/yashasvichaurasia/torchci-vllm
+  tag: latest
+  pullPolicy: Always
+  pullSecret: icr-pull-secret
+
+pod:
+  name: vllm-bench-spyre-pod
+  port: 3000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+clickhouse:
+  url: "http://spyre-dashboard-clickhouse.clickhouse.svc:8123"
+  username: "default"
+  # password is read from the secret below
+
+route:
+  enabled: true
+  # host is auto-generated if empty
+  host: ""
+
+# Secrets — set via --set at install time or create manually
+secrets:
+  clickhousePassword: ""
+  authSecret: ""
+  jwtSecret: ""
+  internalApiToken: ""
+  githubClientId: ""
+  githubClientSecret: ""
