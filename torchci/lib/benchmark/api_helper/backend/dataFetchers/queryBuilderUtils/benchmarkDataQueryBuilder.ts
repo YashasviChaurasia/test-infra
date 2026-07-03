@@ -718,56 +718,185 @@ export class VllmBenchmarkDataFetcher
 }
 
 /**
- * Builder to get Spyre E2E Benchmark data
- * Similar to VllmBenchmarkDataFetcher but without the use_compile='true' filter
+ * Builder to get Spyre E2E Benchmark data from FLAT schema.
+ * The Spyre ClickHouse table uses flat columns (timestamp, name, metric,
+ * actual, repo, head_branch, workflow_id, extra as JSON string) rather than
+ * nested Tuples. This fetcher uses JSONExtractString to pull fields from the
+ * extra column.
  */
 export class SpyreBenchmarkDataFetcher
   extends ExecutableQueryBase
   implements BenchmarkDataFetcher
 {
-  private _data_query: BenchmarkDataQuery;
+  private _format_config: { [key: string]: BenchmarkGroupConfig } = deepClone(
+    DEFAULT_BENCHMARK_GROUP_MAP
+  );
+  private _extra_keys = new Set<string>([
+    "use_compile",
+    "tensor_parallel_size",
+    "input_len",
+    "output_len",
+    "hardware_type",
+  ]);
+
+  DEFAULT_PARAMS = {
+    branches: [],
+    backends: [],
+    devices: [],
+    arches: [],
+    dtypes: [],
+    modes: [],
+    granularity: "hour",
+    excludedMetrics: [],
+    models: [],
+    workflows: [],
+    device: "",
+    arch: "",
+  };
+
   constructor() {
     super();
-    this._data_query = new BenchmarkDataQuery();
-    this._data_query.addExtraInfos(
-      new Map([
-        [
-          "use_compile",
-          `tupleElement(o.benchmark, 'extra_info')['use_compile']`,
-        ],
-        [
-          "tensor_parallel_size",
-          `tupleElement(o.benchmark, 'extra_info')['tensor_parallel_size']`,
-        ],
-        [
-          "input_len",
-          `tupleElement(o.benchmark, 'extra_info')['input_len']`,
-        ],
-        [
-          "output_len",
-          `tupleElement(o.benchmark, 'extra_info')['output_len']`,
-        ],
-        [
-          "hardware_type",
-          `tupleElement(o.benchmark, 'extra_info')['hardware_type']`,
-        ],
-      ])
-    );
   }
+
   applyFormat(
     data: any[],
     formats: string[],
     includesAllExtraKey: boolean = true,
     _groupByFields?: string[]
   ) {
-    return this._data_query.applyFormat(data, formats, includesAllExtraKey);
+    const config = deepClone(this._format_config);
+    if (includesAllExtraKey) {
+      config.time_series.group_key = [
+        ...config.time_series.group_key,
+        ...Array.from(this._extra_keys).map((key) => `extra_key.${key}`),
+      ];
+      config.table.group_key = [
+        ...config.table.group_key,
+        ...Array.from(this._extra_keys).map((key) => `extra_key.${key}`),
+      ];
+    }
+    return toBenchmarkTimeSeriesReponseFormat(data, config, formats);
   }
 
   toQueryParams(inputs: any, id?: string): Record<string, any> {
-    return this._data_query.toQueryParams(inputs, id);
+    if (!inputs.benchmarkName && !inputs.benchmarkNames) {
+      throw new Error(
+        "[SpyreBenchmarkDataFetcher] benchmarkName or benchmarkNames must be provided"
+      );
+    }
+    if (!inputs.repo) {
+      throw new Error("repo must be provided");
+    }
+    if (inputs.benchmarkName && !inputs.benchmarkNames) {
+      inputs.benchmarkNames = [inputs.benchmarkName];
+    }
+    if (inputs.branch && !inputs.branches) {
+      inputs.branches = [inputs.branch];
+    }
+    if (inputs.arch && !inputs.arches) {
+      inputs.arches = [inputs.arch];
+    }
+    if (inputs.model && !inputs.models) {
+      inputs.models = [inputs.model];
+    }
+    const params = { ...this.DEFAULT_PARAMS, ...inputs };
+    console.log("[SpyreBenchmarkDataFetcher] query params:", params);
+    return params;
   }
 
   build() {
-    return this._data_query.build();
+    return `
+    WITH benchmarks AS (
+        SELECT
+            replaceOne(o.head_branch, 'refs/heads/', '') AS branch,
+            o.workflow_id AS workflow_id,
+            '' AS job_id,
+            o.repo AS repo,
+            JSONExtractString(o.extra, 'head_sha') AS commit,
+            JSONExtractString(o.extra, 'model') AS model,
+            '' AS backend,
+            '' AS origins,
+            o.metric AS metric,
+            o.actual AS value,
+            o.target AS target,
+            '' AS mode,
+            '' AS dtype,
+            JSONExtractString(o.extra, 'device') AS device,
+            JSONExtractString(o.extra, 'arch') AS arch,
+            DATE_TRUNC(
+                {granularity: String},
+                fromUnixTimestamp(intDiv(o.timestamp, 1000))
+            ) AS granularity_bucket,
+            map(
+                'use_compile', 'true',
+                'tensor_parallel_size', JSONExtractString(o.extra, 'tensor_parallel_size'),
+                'input_len', JSONExtractString(o.extra, 'input_len'),
+                'output_len', JSONExtractString(o.extra, 'output_len'),
+                'hardware_type', JSONExtractString(o.extra, 'hardware_type')
+            ) AS extra_key,
+            map(
+                'timestamp', formatDateTime(fromUnixTimestamp(intDiv(o.timestamp, 1000)), '%Y-%m-%dT%H:%i:%sZ')
+            ) AS metadata_info
+        FROM vllm_benchmarks.results_v3 o
+        PREWHERE
+            o.timestamp >= toUnixTimestamp(parseDateTime64BestEffort({startTime: String}, 3)) * 1000
+            AND o.timestamp < toUnixTimestamp(parseDateTime64BestEffort({stopTime: String}, 3)) * 1000
+        WHERE
+            o.repo = {repo: String}
+            AND (
+                has({benchmarkNames: Array(String)}, o.name)
+                OR empty({benchmarkNames: Array(String)})
+            )
+            AND (
+                has({models: Array(String)}, JSONExtractString(o.extra, 'model'))
+                OR empty({models: Array(String)})
+            )
+            AND (
+                NOT has({excludedMetrics: Array(String)}, o.metric)
+                OR empty({excludedMetrics: Array(String)})
+            )
+            AND notEmpty(o.metric)
+    )
+    SELECT DISTINCT
+        workflow_id,
+        repo,
+        branch,
+        commit,
+        job_id,
+        model,
+        backend,
+        origins,
+        metric,
+        value,
+        target,
+        mode,
+        dtype,
+        device,
+        arch,
+        granularity_bucket,
+        extra_key,
+        metadata_info
+    FROM benchmarks
+    WHERE
+        (
+            has({branches: Array(String)}, branch)
+            OR empty({branches: Array(String)})
+        )
+        AND notEmpty(device)
+        AND (
+            startsWith({device: String}, device)
+            OR {device: String} = ''
+        )
+        AND (
+            multiSearchAnyCaseInsensitive(arch, {arches: Array(String)})
+            OR empty({arches: Array(String)})
+        )
+    ORDER BY
+        granularity_bucket DESC,
+        workflow_id DESC,
+        model,
+        device,
+        metric
+    `;
   }
 }
