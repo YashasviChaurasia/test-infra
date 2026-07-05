@@ -846,6 +846,7 @@ export class SpyreBenchmarkDataFetcher
             AND (
                 has({benchmarkNames: Array(String)}, o.name)
                 OR empty({benchmarkNames: Array(String)})
+                OR o.name = 'vLLM Benchmark'
             )
             AND (
                 has({models: Array(String)}, JSONExtractString(o.extra, 'model'))

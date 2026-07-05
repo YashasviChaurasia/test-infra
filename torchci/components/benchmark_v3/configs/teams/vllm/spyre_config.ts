@@ -71,13 +71,13 @@ export const SpyreE2eBenchmarkDashboardConfig: BenchmarkUIConfig = {
     initial: {
       ...DEFAULT_DASHBOARD_BENCHMARK_INITIAL,
       benchmarkId: SPYRE_E2E_BENCHMARK_ID,
-      repo: "ibm/vllm-spyre",
+      repo: "spyre-inference",
       lbranch: "main",
       rbranch: "main",
       filters: {
         device: "spyre",
-        arch: "IBM Spyre",
-        deviceName: "spyre||IBM Spyre",
+        arch: "x86_64",
+        deviceName: "spyre||x86_64",
       },
     },
     required_filter_fields: [],
