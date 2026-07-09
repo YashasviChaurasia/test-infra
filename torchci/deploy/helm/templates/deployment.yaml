@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dashboard.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "dashboard.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dashboard.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dashboard.labels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.image.pullSecret }}
+      containers:
+        - name: dashboard
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pod.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "dashboard.fullname" . }}-config
+            - secretRef:
+                name: {{ include "dashboard.fullname" . }}-secrets
+          resources:
+            {{- toYaml .Values.pod.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.pod.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.pod.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10

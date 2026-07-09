@@ -8,7 +8,7 @@ metadata:
 data:
   CLICKHOUSE_HUD_USER_URL: {{ .Values.clickhouse.url | quote }}
   CLICKHOUSE_HUD_USER_USERNAME: {{ .Values.clickhouse.username | quote }}
-  NEXTAUTH_URL: {{ printf "https://%s" .Values.route.host | quote }}
+  NEXTAUTH_URL: {{ .Values.nextauthUrl | quote }}
   NEXTAUTH_SECRET: {{ .Values.secrets.authSecret | quote }}
   NODE_ENV: "production"
   PORT: {{ .Values.pod.port | quote }}

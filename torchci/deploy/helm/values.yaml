@@ -2,7 +2,7 @@ namespace: torch-spyre-cicd
 
 image:
   repository: icr.io/yashasvichaurasia/torchci-vllm
-  tag: latest
+  tag: v4
   pullPolicy: Always
   pullSecret: icr-pull-secret
 
@@ -21,6 +21,8 @@ clickhouse:
   url: "http://spyre-dashboard-clickhouse.clickhouse.svc:8123"
   username: "default"
   # password is read from the secret below
+
+nextauthUrl: "https://vllm-bench-spyre-dashboard-torch-spyre-cicd.apps.torch-cicd.spyre.res.ibm.com"
 
 route:
   enabled: true
