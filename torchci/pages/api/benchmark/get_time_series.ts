@@ -1,4 +1,5 @@
-import { checkAuthWithApiToken } from "lib/auth/auth";
+// Auth disabled for self-hosted deployment
+// import { checkAuthWithApiToken } from "lib/auth/auth";
 import { CompilerQueryType } from "lib/benchmark/api_helper/backend/common/type";
 import {
   emptyTimeSeriesResponse,
@@ -34,14 +35,14 @@ export default async function handler(
     return res.status(405).json({ error: "Only GET and POST allowed" });
   }
 
-  // check auth and return error if not authorized
-  const auth = await checkAuthWithApiToken(req, res);
-  if (!auth.ok) {
-    return res.status(401).json({
-      error:
-        "Authentication required to require benchmark data, for HUD, please login with your github account",
-    });
-  }
+  // Auth check disabled for self-hosted deployment
+  // const auth = await checkAuthWithApiToken(req, res);
+  // if (!auth.ok) {
+  //   return res.status(401).json({
+  //     error:
+  //       "Authentication required to require benchmark data, for HUD, please login with your github account",
+  //   });
+  // }
 
   const params = readApiGetParams(req);
   console.log("[API]get_time_series, received request:", params);
