@@ -127,7 +127,7 @@ export const BENCHMARK_ID_MAPPING: Record<string, BenchmarkIdMappingItem> = {
   },
   [SPYRE_E2E_BENCHMARK_ID]: {
     id: SPYRE_E2E_BENCHMARK_ID,
-    repoName: "ibm/vllm-spyre",
+    repoName: "spyre-inference",
     benchmarkName: "spyre_e2e_benchmark",
   },
   [PYTORCH_GPTFAST_BENCHMARK_ID]: {
@@ -284,7 +284,7 @@ export const BENCHMARK_CATEGORIES: BenchmarkCategoryGroup[] = [
   },
   {
     title: "Spyre Benchmarks",
-    tags: ["repo:ibm/vllm-spyre"],
+    tags: ["repo:spyre-inference"],
     subtitle: "vLLM benchmarks on IBM Spyre accelerators",
     items: [
       {
