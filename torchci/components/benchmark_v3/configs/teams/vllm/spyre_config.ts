@@ -76,8 +76,6 @@ export const SpyreE2eBenchmarkDashboardConfig: BenchmarkUIConfig = {
       rbranch: "main",
       filters: {
         device: "spyre",
-        arch: "x86_64",
-        deviceName: "spyre||x86_64",
       },
     },
     required_filter_fields: [],

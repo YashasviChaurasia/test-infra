@@ -11,4 +11,6 @@ data:
   NEXTAUTH_URL: {{ .Values.nextauthUrl | quote }}
   NEXTAUTH_SECRET: {{ .Values.secrets.authSecret | quote }}
   NODE_ENV: "production"
+  NO_COLOR: "1"
+  FORCE_COLOR: "0"
   PORT: {{ .Values.pod.port | quote }}

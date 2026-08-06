@@ -2,7 +2,7 @@ namespace: torch-spyre-cicd
 
 image:
   repository: icr.io/yashasvichaurasia/torchci-vllm
-  tag: v4
+  tag: v5
   pullPolicy: Always
   pullSecret: icr-pull-secret
 
