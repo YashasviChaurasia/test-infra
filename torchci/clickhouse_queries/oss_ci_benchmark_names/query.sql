@@ -9,7 +9,7 @@ SELECT DISTINCT
     device,
     arch
 FROM
-    vllm_benchmarks.run_metadata
+    spyre.run_metadata
 WHERE
     timestamp >= toUnixTimestamp({startTime: DateTime64(3) })
     AND timestamp < toUnixTimestamp({stopTime: DateTime64(3) })

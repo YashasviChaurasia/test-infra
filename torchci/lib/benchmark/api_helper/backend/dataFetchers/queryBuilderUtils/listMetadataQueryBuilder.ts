@@ -24,7 +24,7 @@ export class BenchmarkMetadataQuery
   constructor() {
     super();
     this.builder = new QueryBuilder({
-      table: "vllm_benchmarks.run_metadata",
+      table: "spyre.run_metadata",
       distinct: true,
       select: [
         ["benchmark_name", "benchmark"],

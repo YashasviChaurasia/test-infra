@@ -3,7 +3,7 @@ SELECT
     head_sha AS commit,
     workflow_id,
     toStartOfHour(min(fromUnixTimestamp(intDiv(timestamp, 1000)))) AS date
-FROM vllm_benchmarks.run_metadata
+FROM spyre.run_metadata
 PREWHERE
     timestamp >= toUnixTimestamp(parseDateTime64BestEffort({startTime: String}, 3)) * 1000
     AND timestamp < toUnixTimestamp(parseDateTime64BestEffort({stopTime: String}, 3)) * 1000

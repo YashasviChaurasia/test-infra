@@ -100,7 +100,7 @@ WITH benchmarks AS (
             formatDateTime(fromUnixTimestamp(o.timestamp), '%Y-%m-%dT%H:%i:%sZ')
         ) AS metadata_info --  metadata_info for a record
     FROM
-        vllm_benchmarks.results_v3 o
+        spyre.results_v3 o
     WHERE
         o.timestamp >= toUnixTimestamp({startTime: DateTime64(3) })
         AND o.timestamp < toUnixTimestamp({stopTime: DateTime64(3) })

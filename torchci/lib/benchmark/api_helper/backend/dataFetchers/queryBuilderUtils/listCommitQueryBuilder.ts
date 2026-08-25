@@ -20,7 +20,7 @@ export class BenchmarkListCommitQueryBuilder
     super();
     this.builder = new QueryBuilder(
       {
-        table: "vllm_benchmarks.run_metadata",
+        table: "spyre.run_metadata",
         select_exists: true,
         where_exists: true,
         prewhere: [

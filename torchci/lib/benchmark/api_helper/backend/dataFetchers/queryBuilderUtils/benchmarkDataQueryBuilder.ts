@@ -99,7 +99,7 @@ export class BenchmarkDataQuery extends ExecutableQueryBase {
 
     this._inner_query_builder = new QueryBuilder(
       {
-        table: "vllm_benchmarks.results_v3 o",
+        table: "spyre.results_v3 o",
         select_exists: true,
         where_exists: true,
         // default select statement for customized query
@@ -837,7 +837,7 @@ export class SpyreBenchmarkDataFetcher
             map(
                 'timestamp', formatDateTime(fromUnixTimestamp(intDiv(o.timestamp, 1000)), '%Y-%m-%dT%H:%i:%sZ')
             ) AS metadata_info
-        FROM vllm_benchmarks.results_v3 o
+        FROM spyre.results_v3 o
         PREWHERE
             o.timestamp >= toUnixTimestamp(parseDateTime64BestEffort({startTime: String}, 3)) * 1000
             AND o.timestamp < toUnixTimestamp(parseDateTime64BestEffort({stopTime: String}, 3)) * 1000
